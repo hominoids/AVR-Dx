@@ -10,6 +10,7 @@
 */
  
 #include <avr/io.h>
+#include <stdbool.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include "twi.h"
@@ -18,19 +19,36 @@
 /* 
  *  twi/i2c initialization for all ports and modes.
  *   
- *  uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint8_t BAUD)
- *                   TWI_MODE = TWI_MODE_HOST, TWI_MODE_CLIENT, TWI_MODE_DUAL
+ *  uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_PINS, uint8_t TWI_MODE, uint8_t BAUD, bool TWI_SMART)
  *                    TWIPORT = TWI0, TWI1
- *                       BAUD = bus baud rate 100000, 400000, 1000000
+ *                   TWI_PINS = TWI_PINS_DEFAULT, TWI_PINS_ALT1, TWI_PINS_ALT2
+ *                   TWI_MODE = TWI_MODE_HOST, TWI_MODE_CLIENT, TWI_MODE_DUAL
+ *                       BAUD = bus freq 100000, 400000, 1000000
+ *                  TWI_SMART = TRUE, FALSE
  */
-uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
+ 
+uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_PINS, uint8_t TWI_MODE, uint32_t BAUD, bool TWI_SMART) {
 
     if(TWI_MODE == TWI_MODE_HOST) {
         switch(TWIPORT) {
             case TWI0_I2C :
+                // set twi pin mux
+                switch(TWI_PINS) {
+                    case TWI_PINS_ALT1 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_ALT1_gc;   /* PA2, PA3, PC6, PC7 */
+                    case TWI_PINS_ALT2 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_ALT2_gc;   /* PC2, PC3, PC6, PC7 */
+                    case TWI_PINS_DEFAULT :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_DEFAULT_gc;    /* PA2, PA3, PC2, PC3 */
+                    default :
+                        break;
+                }
 
-                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles, TIMEOUT 100us
-                TWI0_CTRLA = TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc || TWI_TIMEOUT_100US_gc;            
+                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles
+                TWI0_CTRLA = TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc; 
+                
+                // enable smart mode
+                if(TWI_SMART) TWI0_MCTRLA = TWI_SMEN_bm;          
                 
                 if(BAUD == 1000000UL) {
                     TWI0_CTRLA = TWI_FMPEN_ON_gc;
@@ -41,7 +59,10 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
 
                 // set baud rate
                 TWI0_MBAUD = TWI0_BAUDRATE(BAUD, 0);
-
+                
+                // configure TIMEOUT 50us
+                TWI0_CTRLA = TWI_TIMEOUT_50US_gc;
+                
                 // set ENABLE bit
                 TWI0_MCTRLA = TWI_ENABLE_bm;
 
@@ -57,8 +78,23 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
                     return(1);
                 }
             case TWI1_I2C :
-                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles, TIMEOUT 100us
-                TWI1_CTRLA =  TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc || TWI_TIMEOUT_100US_gc;
+                // set twi pin mux
+                switch(TWI_PINS) {
+                    case TWI_PINS_ALT1 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_DEFAULT_gc;   /* PF2, PF3 */
+                    case TWI_PINS_ALT2 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_ALT2_gc;   /* PB2, PB3 */
+                    case TWI_PINS_DEFAULT :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_DEFAULT_gc;    /* PF2, PF3, PB2, PB3 */
+                    default :
+                        break;
+                }
+
+                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles
+                TWI1_CTRLA =  TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc;
+
+                // enable smart mode
+                if(TWI_SMART) TWI1_MCTRLA = TWI_SMEN_bm;          
                 
                 if(BAUD == 1000000UL) {
                     TWI1_CTRLA = TWI_FMPEN_ON_gc;
@@ -70,6 +106,9 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
                 // set baud rate
                 TWI1_MBAUD = TWI1_BAUDRATE(BAUD, 0);
 
+                // configure TIMEOUT 50us
+                TWI0_CTRLA = TWI_TIMEOUT_50US_gc;
+                
                 // set ENABLE bit
                 TWI1_MCTRLA = TWI_ENABLE_bm;
                 
@@ -91,9 +130,23 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
     if(TWI_MODE == TWI_MODE_CLIENT) {
         switch(TWIPORT) {
             case TWI0_I2C :
-                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles, TIMEOUT 100us
-                TWI0_CTRLA = TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc || TWI_TIMEOUT_100US_gc;
+                // set twi pin mux
+                switch(TWI_PINS) {
+                    case TWI_PINS_ALT1 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_ALT1_gc;   /* PA2, PA3, PC6, PC7 */
+                    case TWI_PINS_ALT2 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_ALT2_gc;   /* PC2, PC3, PC6, PC7 */
+                    case TWI_PINS_DEFAULT :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_DEFAULT_gc;    /* PA2, PA3, PC2, PC3 */
+                    default :
+                        break;
+                }
+                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles
+                TWI0_CTRLA = TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc;
 
+                // enable smart mode
+                if(TWI_SMART) TWI0_SCTRLA = TWI_SMEN_bm;
+                    
                 // set address
                 TWI0_SADDR = TWI0_ADDR;
 
@@ -103,11 +156,22 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
                 return(0);
                 
             case TWI1_I2C :
-                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles, TIMEOUT 100us
-                TWI1_CTRLA = TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc || TWI_TIMEOUT_100US_gc;
+                // set twi pin mux
+                switch(TWI_PINS) {
+                    case TWI_PINS_ALT1 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_DEFAULT_gc;   /* PF2, PF3 */
+                    case TWI_PINS_ALT2 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_ALT2_gc;   /* PB2, PB3 */
+                    case TWI_PINS_DEFAULT :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_DEFAULT_gc;    /* PF2, PF3, PB2, PB3 */
+                    default :
+                        break;
+                }
+                // configure INPUTLVL I2C, SDAHOLD 50ns, SDASETUP 4 cycles
+                TWI1_CTRLA = TWI_INPUTLVL_I2C_gc || TWI_SDAHOLD_50NS_gc || TWI_SDASETUP_4CYC_gc;
                 
-                // configure SDASETUP to 4 cycles
-                TWI1_CTRLA = TWI_SDASETUP_4CYC_gc;
+                // enable smart mode
+                if(TWI_SMART) TWI1_SCTRLA = TWI_SMEN_bm;
 
                 // set address
                 TWI1_SADDR = TWI1_ADDR;
@@ -124,12 +188,26 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
     if(TWI_MODE == TWI_MODE_DUAL) {
         switch(TWIPORT) {
             case TWI0_I2C :
+                // set twi pin mux
+                switch(TWI_PINS) {
+                    case TWI_PINS_ALT1 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_ALT1_gc;   /* PA2, PA3, PC6, PC7 */
+                    case TWI_PINS_ALT2 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_ALT2_gc;   /* PC2, PC3, PC6, PC7 */
+                    case TWI_PINS_DEFAULT :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI0_DEFAULT_gc;    /* PA2, PA3, PC2, PC3 */
+                    default :
+                        break;
+                }
                 // configure SDAHOLD to 50ns
                 TWI0_CTRLA = TWI_SDAHOLD_50NS_gc;
                 
                 // configure INPUTLVL I2C, SDASETUP 4 cycles
                 TWI0_DUALCTRL = TWI_INPUTLVL_I2C_gc || TWI_SDASETUP_4CYC_gc;
 
+                // enable smart mode
+                if(TWI_SMART) TWI0_SCTRLA = TWI_SMEN_bm;
+                
                 // set address
                 TWI0_SADDR = TWI0_ADDR;
 
@@ -139,12 +217,26 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
                 return(0);
                 
             case TWI1_I2C :
+                // set twi pin mux
+                switch(TWI_PINS) {
+                    case TWI_PINS_ALT1 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_DEFAULT_gc;   /* PF2, PF3 */
+                    case TWI_PINS_ALT2 :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_ALT2_gc;   /* PB2, PB3 */
+                    case TWI_PINS_DEFAULT :
+                        PORTMUX_TWIROUTEA = PORTMUX_TWI1_DEFAULT_gc;    /* PF2, PF3, PB2, PB3 */
+                    default :
+                        break;
+                }
                 // configure SDAHOLD to 50ns
                 TWI1_CTRLA = TWI_SDAHOLD_50NS_gc;
                 
                 // configure INPUTLVL I2C, SDASETUP 4 cycles
                 TWI1_DUALCTRL = TWI_INPUTLVL_I2C_gc || TWI_SDASETUP_4CYC_gc;
 
+                // enable smart mode
+                if(TWI_SMART) TWI1_SCTRLA = TWI_SMEN_bm;
+                
                 // set address
                 TWI1_SADDR = TWI1_ADDR;
 
@@ -160,15 +252,3 @@ uint8_t twi_init(uint8_t TWI_MODE, uint8_t TWIPORT, uint32_t BAUD) {
 }
 
 
-/* error handler */
-void error(uint8_t num)
-{
-    PORTC_DIRSET = 0x40;
-    for (int i = 0; i <= num; i++) {
-        PORTC_OUTSET = 0x40;
-        _delay_ms(25);
-        PORTC_OUTCLR = 0x40;
-        _delay_ms(25);
-    }
-        _delay_ms(500);
-}
