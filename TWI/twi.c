@@ -5,7 +5,7 @@
  * Author:  Edward Kisiel
  * License: GNU GPLv3
  *
- * Description: AVRDx TWI driver for I2C interface.
+ * Description: AVRDx TWI driver for I2C and SMBUS interface.
  *
 */
  
@@ -16,7 +16,7 @@
 #include "twi.h"
 
 /* 
- *  twi/i2c initialization for all ports and modes.
+ *  twi initialization for all ports and modes.
  *   
  *  uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_MODE, uint8_t FREQ, struct twi_bus *twi_bus)
  *                    TWIPORT = TWI0_PORT, TWI1_PORT
@@ -25,7 +25,6 @@
  *                   *twi_bus = struct twi_bus {
  *                                  int  bustype;    // TWI_I2C, TWI_SMB
  *                                  int  pins;       // TWI_PINS_DEFAULT, TWI_PINS_ALT1, TWI_PINS_ALT2
- *                                  bool pullups;    // true, false
  *                                  int  sdahold;    // TWI_SDAHOLD_OFF_gc, TWI_SDAHOLD_50NS_gc, 
  *                                                      TWI_SDAHOLD_300NS_gc, TWI_SDAHOLD_500NS_gc
  *                                  int  sdasetup;   // TWI_SDASETUP_4CYC_gc, TWI_SDASETUP_8CYC_gc
@@ -62,15 +61,6 @@ uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_MODE, uint32_t FREQ, struct twi_bu
                     break;
             }
 
-            // configure SDASETUP
-            switch(twi_bus->sdasetup) {
-                case TWI_SDASETUP_4CYC_gc :
-                    TWI0_CTRLA = TWI_SDASETUP_4CYC_gc;
-                case TWI_SDASETUP_8CYC_gc :
-                    TWI0_CTRLA = TWI_SDASETUP_8CYC_gc;
-                default :
-                    break;
-            }
         }
 
         // configure SDAHOLD 
@@ -115,6 +105,12 @@ uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_MODE, uint32_t FREQ, struct twi_bu
                 default :
                     break;
             }
+            
+            // set bits for read and write interupts
+            if(twi_bus->intrupt) {
+               TWI0_MCTRLA = TWI_WIEN_bm;
+               TWI0_MCTRLA = TWI_RIEN_bm;
+            }
 
             // set ENABLE bit
             TWI0_MCTRLA = TWI_ENABLE_bm;
@@ -136,9 +132,26 @@ uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_MODE, uint32_t FREQ, struct twi_bu
             // enable smart mode
             if(twi_bus->smart) TWI0_SCTRLA = TWI_SMEN_bm;
                 
+            // configure SDASETUP
+            switch(twi_bus->sdasetup) {
+                case TWI_SDASETUP_4CYC_gc :
+                    TWI0_CTRLA = TWI_SDASETUP_4CYC_gc;
+                case TWI_SDASETUP_8CYC_gc :
+                    TWI0_CTRLA = TWI_SDASETUP_8CYC_gc;
+                default :
+                    break;
+            }
+            
+            // set bits for address/stop and data interupts
+            if(twi_bus->intrupt) {
+               TWI0_SCTRLA = TWI_APIEN_bm;
+               TWI0_SCTRLA = TWI_DIEN_bm;
+               TWI0_SCTRLA = TWI_PIEN_bm;
+            }
+
             // set address
             TWI0_SADDR = TWI0_ADDR;
-
+            
             // set ENABLE bit
             TWI0_SCTRLA = TWI_ENABLE_bm;
             
@@ -202,16 +215,6 @@ uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_MODE, uint32_t FREQ, struct twi_bu
                 default :
                     break;
             }
-
-            // configure SDASETUP
-            switch(twi_bus->sdasetup) {
-                case TWI_SDASETUP_4CYC_gc :
-                    TWI1_CTRLA = TWI_SDASETUP_4CYC_gc;
-                case TWI_SDASETUP_8CYC_gc :
-                    TWI1_CTRLA = TWI_SDASETUP_8CYC_gc;
-                default :
-                    break;
-            }
         }
         
         // configure SDAHOLD 
@@ -257,6 +260,12 @@ uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_MODE, uint32_t FREQ, struct twi_bu
                     break;
             }
             
+            // set bits for read and write interupts
+            if(twi_bus->intrupt) {
+               TWI1_MCTRLA = TWI_WIEN_bm;
+               TWI1_MCTRLA = TWI_RIEN_bm;
+            }
+            
             // set ENABLE bit
             TWI1_MCTRLA = TWI_ENABLE_bm;
             
@@ -277,6 +286,23 @@ uint8_t twi_init(uint8_t TWIPORT, uint8_t TWI_MODE, uint32_t FREQ, struct twi_bu
             // enable smart mode
             if(twi_bus->smart) TWI1_SCTRLA = TWI_SMEN_bm;
 
+            // set bits for address/stop and data interupts
+            if(twi_bus->intrupt) {
+               TWI1_SCTRLA = TWI_APIEN_bm;
+               TWI1_SCTRLA = TWI_DIEN_bm;
+               TWI1_SCTRLA = TWI_PIEN_bm;
+            }
+
+            // configure SDASETUP
+            switch(twi_bus->sdasetup) {
+                case TWI_SDASETUP_4CYC_gc :
+                    TWI1_CTRLA = TWI_SDASETUP_4CYC_gc;
+                case TWI_SDASETUP_8CYC_gc :
+                    TWI1_CTRLA = TWI_SDASETUP_8CYC_gc;
+                default :
+                    break;
+            }
+            
             // set address
             TWI1_SADDR = TWI1_ADDR;
 

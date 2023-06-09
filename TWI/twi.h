@@ -5,7 +5,7 @@
  * Author:  Edward Kisiel
  * License: GNU GPLv3
  *
- * Description: AVRDx TWI driver for I2C interface.
+ * Description: AVRDx TWI driver for I2C and SMBUS interface.
  *
 */
 
@@ -44,7 +44,6 @@
 struct twi_bus {
     int  bustype;    // TWI_I2C, TWI_SMB
     int  pins;       // TWI_PINS_DEFAULT, TWI_PINS_ALT1, TWI_PINS_ALT2
-    bool pullups;    // true, false
     int  sdahold;    // TWI_SDAHOLD_OFF_gc, TWI_SDAHOLD_50NS_gc, TWI_SDAHOLD_300NS_gc, TWI_SDAHOLD_500NS_gc
     int  sdasetup;   // TWI_SDASETUP_4CYC_gc, TWI_SDASETUP_8CYC_gc
     int  timeout;    // TWI_TIMEOUT_DISABLED_gc, TWI_TIMEOUT_50US_gc, TWI_TIMEOUT_100US_gc, TWI_TIMEOUT_200US_gc 
